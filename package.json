@@ -1,0 +1,21 @@
+{
+  "name": "backend-project-management",
+  "version": "1.0.0",
+  "description": "A backend project based on Basecamp project management. ",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "keywords": [
+    "Node.js",
+    "MongoDB",
+    "API",
+    "JWT"
+  ],
+  "author": "itsarnab",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "3.7.4"
+  }
+}
