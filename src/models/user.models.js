@@ -64,9 +64,10 @@ const userSchema = new Schema(
 );
 
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password")) {
+    return;
+  }
   this.password = await bcrypt.hash(this.password, 10);
-  next();
 });
 
 //using the schema methods to compare the password is correct or not
@@ -111,7 +112,7 @@ userSchema.methods.generateTemporaryToken = function () {
   const unHashedToken = crypto.randomBytes(20).toString("hex");
 
   const hashedToken = crypto
-    .createHash("256")
+    .createHash("sha256")
     .update(unHashedToken)
     .digest("hex");
 
