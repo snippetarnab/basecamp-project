@@ -2,7 +2,11 @@ import { User } from "../models/user.models.js";
 import { ApiError } from "../utils/api-error.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { asyncHandler } from "../utils/async-handler.js";
-import { emailVerificationMailgenContent, sendEmail } from "../utils/mail.js";
+import {
+  emailVerificationMailgenContent,
+  forgotPasswordMailgenContent,
+  sendEmail,
+} from "../utils/mail.js";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
@@ -251,6 +255,74 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
+//forgot password request
+const forgotPasswordRequest = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const user = User.findOne({ email });
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  const { hashedToken, unHashedToken, tokenExpiry } =
+    user.generateTemporaryToken();
+  user.forgotPasswordToken = hashedToken;
+  user.forgotPasswordExpiry = tokenExpiry;
+  await user.save({ validateBeforeSave: false });
+  await sendEmail({
+    email: user?.email,
+    subject: "Forgot password request",
+    mailgenContent: forgotPasswordMailgenContent(
+      user.username,
+      `${process.env.FORGOT_PASSWORD_REDIRECT_URL}/${unHashedToken}`,
+    ),
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Password reset mail send to your email"), {});
+});
+
+//forgot password reset
+const resetForgotPassword = asyncHandler(async (req, res) => {
+  const { resetToken } = req.params;
+  const { newPassword } = req.body;
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  const user = await User.findOne({
+    forgotPasswordToken: hashedToken,
+    forgotPasswordExpiry: { $gt: Date.now() },
+  });
+  if (!user) {
+    throw new ApiError(401, "Token is invalid or expire");
+  }
+  user.forgotPasswordExpiry = undefined;
+  user.forgotPasswordToken = undefined;
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: flase });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password reset successfully"));
+});
+
+//change the passsword
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  const user = await User.findOne(user?._id);
+  const isPasswordValid = user.isPasswordCorrect(oldPassword);
+  if (!isPasswordValid) {
+    throw new ApiError(400, "Invalid old Password");
+  }
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+
 export {
   registerUser,
   login,
@@ -259,4 +331,7 @@ export {
   verifyEmail,
   resendEmailVerification,
   refreshAccessToken,
+  forgotPasswordRequest,
+  resetForgotPassword,
+  changeCurrentPassword,
 };
